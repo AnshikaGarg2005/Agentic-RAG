@@ -1,123 +1,272 @@
-# Agentic RAG - Web Search with Accuracy and Hallucination Controls
+# Agentic RAG
 
-### Boost RAG with an Agentic Layer
-- **Route**: Checks the RAG context for relevance to the query and adds live web search if the context is thin
-- **Evaluate**: Checks responses for relevance and accuracy, flags hallucinations
-- **Iterate**: Goes through multiple evaluation and generation cycles
+> A source-grounded question-answering application for uploaded documents and indexed webpages, with web search used only when no local context exists.
 
-### Modify Agentic RAG
-- **Edit Prompts**: Customize results through your own prompts
-- **Change Parameters**: Adjust agent behavior through parameters and runtime variables
-- **Look and Feel**: Change the agent and UI by editing the code yourself
+**Author:** Anshika Garg  
+**Email:** Anshika.120611@stu.upes.ac.in  
+**Institution:** School of Computer Science, UPES, Dehradun
 
-### Inference Your Way
-- **Free Endpoints**: use free endpoints on build.nvidia.com
-- **Self-Hosted**: Point to Ollama or NIM on your own GPUs
+## Overview
 
-## Get Started 
+Agentic RAG is a Retrieval-Augmented Generation application for dependable question answering over user-provided sources. It accepts PDFs, TXT files, Markdown files, CSV files, and webpage URLs; converts source content into searchable vector representations; retrieves relevant passages; and creates an answer grounded in those passages.
 
-#### This README has three modes:
-- **Easy Mode**: Use the application
-- **Intermediate Mode**: Modify the application
-- **Advanced Mode**: Self-host gpus for inference
+Rather than relying on a single prompt, the application uses an agentic workflow. It checks retrieved passages for relevance, checks whether the generated answer is grounded in the evidence, evaluates whether the response addresses the question, and follows a safe not-found path when selected sources do not contain the answer.
 
-### Prerequisites - AI Workbench and an Internet Connection
+## Key Features
 
-> You can run Agentic RAG without Workbench, but this README requires [NVIDIA AI Workbench](https://www.nvidia.com/en-us/deep-learning-ai/solutions/data-science/workbench/) installed.
-> See [how to install it here](https://docs.nvidia.com/ai-workbench/user-guide/latest/installation/overview.html).
+- Upload and index **PDF, TXT, Markdown, and CSV** files.
+- Add and index **webpage URLs** as local knowledge-base sources.
+- Create a session-specific **ChromaDB** vector collection.
+- Retrieve semantically relevant chunks using NVIDIA embeddings.
+- Generate responses with the NVIDIA Nemotron model.
+- Grade retrieved chunks for relevance before generation.
+- Check generated answers for grounding and usefulness.
+- Use **Tavily web search only when no documents or URLs are indexed**.
+- Return a safe not-found response instead of blending unrelated web information into an active document context.
+- Provide a Streamlit interface for source management and chat.
 
-> You need internet because Agentic RAG uses an NVIDIA endpoint for document embedding.
+## System Workflow
 
-### Easy Mode (< 5 minutes if Workbench installed)
-1. Get NVIDIA and Tavily API keys:  
-   - ``NVIDIA_API_KEY`` → [Generate](https://org.ngc.nvidia.com/setup/api-keys)  See instructions [here](https://docs.nvidia.com/ai-enterprise/deployment/spark-rapids-accelerator/latest/appendix-ngc.html).
-   - ``TAVILY_API_KEY`` → [Generate](https://tavily.com)  
-2. **Clone** this repo with AI Workbench > [configure the keys](https://docs.nvidia.com/ai-workbench/user-guide/latest/environment/variables.html#basic-usage-for-environment-variables) when prompted.  
-3. Click **Open Chat** > Go to the **Document** tab in the web app > Click **Add to Context**.  
-4. Type in your question > Hit enter - answers come from free cloud endpoints.
+```text
+Files / URLs
+     |
+Load, split, and embed source content
+     |
+ChromaDB session collection
+     |
+User question
+     |
+Is indexed context available?
+   |                       |
+ Yes                      No
+   |                       |
+Retrieve local chunks     Tavily web search
+   |                       |
+Relevance grading --------+
+     |
+Generate answer with NVIDIA Nemotron
+     |
+Grounding check and answer-quality check
+     |
+Final answer or safe not-found response
+```
 
-## Details for the README Modes
-<details>
-<summary><strong>Click to Expand Easy Mode</strong></summary>
+## Technology Stack
 
-<img src="data/readme-images/static/agentic-rag-screen-shot.png" width="80%" height="auto" alt="Agentic RAG Web App Screenshot">
+| Area | Technology |
+|---|---|
+| Frontend | Streamlit |
+| Agent orchestration | LangGraph |
+| LLM and embeddings | NVIDIA API / NVIDIA Nemotron |
+| Vector database | ChromaDB via `langchain-chroma` |
+| Document processing | LangChain community loaders and PyPDF |
+| Web search | Tavily Search API |
+| Environment management | Python virtual environment and `python-dotenv` |
 
-### Clone Project > Start Chat >  Create Context >  Ask Questions
+## Prerequisites
 
+- Python 3.10 or later (Python 3.12 is supported)
+- An NVIDIA API key from [NVIDIA Build](https://build.nvidia.com/)
+- A Tavily API key from [Tavily](https://tavily.com/) for web-search fallback
+- Internet access for hosted model inference and web search
 
-| Steps | What can go wrong | Screen shot |
-|------|--------------------|-------------|
-| 1. Open the Desktop App > Select [local](https://docs.nvidia.com/ai-workbench/user-guide/latest/locations/locations.html). | Probably a  Docker Desktop issue (if selected on install). **Fix**:  See [troubleshooting here](https://docs.nvidia.com/ai-workbench/user-guide/latest/troubleshooting/troubleshooting.html) | <p align="center"><img src="./data/readme-images/desktop-icon.png" width="120" alt="Desktop App Icon"></p> |
-| 2. Click **Clone Project** > Paste repository [URL](https://github.com/NVIDIA/workbench-example-agentic-rag) > **Clone** | Incorrect URL. **Fix**: use the correct URL. | <img src="./data/readme-images/clone-button.png" width="250" height="auto" alt="Clone Button"> |
-| 3. Click **Resolve Now** > Enter NVIDIA and Tavily API keys. | You don't see the banner. **Fix**: go to **Project Container > Variables > Configure** for API keys. See [docs here](https://docs.nvidia.com/ai-workbench/user-guide/latest/environment/variables.html) | <img src="./data/readme-images/resolve-now.png" width="200" height="auto" alt="Resolve Now Warning"> |
-| 4. Click **Open Chat**. | Very little can go wrong here | <img src="./data/readme-images/open-chat-screen-shot.png" width="250" height="auto" alt="Open Chat Button"> |
-| 5. Click **Documents > Create Context**. | Incorrect API key. Fix per Step 3 above. | <img src="./data/readme-images/add-to-context-button.png" width="300" height="auto" alt="Add to Context Button"> |
-| 6. Type question > Hit  enter. |  Incorrect API key. Fix per Step 3 above. | <img src="./data/readme-images/hit-enter.png" width="200" height="auto" alt="Chat Text"> |
+## Installation
 
-### Clear Context > Change URLs > Create Context  > Ask Questions
+### 1. Clone the repository
 
-Use these steps when you want to work with your own documents and your own prompts.
+```bash
+git clone https://github.com/Harshit-Verma03/Agentic-RAG.git
+cd Agentic-RAG
+```
 
-| Steps | What can go wrong | Screen shot | 
-|------|--------------------|-------------|
-| 1. Click **Documents > Clear Context**. | Very little. | Vector DB reset. |
-| 2. Delete the URLs > Add your own > Click **Add to Context**. |   URLs that can't be resolved. **Fix**: Enter appropriate URLs | New context. |
-| 3. Type question > Hit enter. |  Incorrect API key. **Fix**: Fix per Step 3 in table above. | Triggers the agent. |
+### 2. Create and activate a virtual environment
 
+On macOS/Linux:
 
-</details>
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
 
-<details>
-<summary><strong>Click to Expand Intermediate Mode</strong></summary>
+On Windows PowerShell:
 
-## Intermediate Mode
-<img src="code/chatui/static/agentic-flow.png" width="100%" height="auto" alt="Diagram of Agentic Framework">
+```powershell
+python -m venv venv
+venv\Scripts\Activate.ps1
+```
 
-#### See [Full Intermediate Mode Instructions Here](agentic-rag-docs/intermediate-edit-code.md)
+### 3. Install dependencies
 
-This application is a quick prototype and not a robust piece of software. So there are **many** opportunities to improve it.
+```bash
+pip install -r requirements.txt
+```
 
-1. [Fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo#forking-a-repository) this project to your own GitHub account. Then clone it in Workbench
-2. [Add VS Code to the project](https://docs.nvidia.com/ai-workbench/user-guide/latest/applications/vs-code.html)
-3. Create an ``experiment`` branch to protect main
-4. Open VS Code from the Desktop App and edit the application code
-   - Change recursion limit, number of web sites returned by Tavily, whether previous searches are saved
-   - Add new endpoints from build.nvidia.com
-   - Change the look and feel of the Gradio app or add new features
-   - Modify the agent
-   - Fix any bugs you find
+### 4. Configure API keys
 
+Create `.env` from the provided template:
 
-</details>
+```bash
+cp .env.example .env
+```
 
-<details>
-<summary><strong>Click to Expand Advanced Mode</strong></summary>
+Open `.env` and add your keys:
 
-## Advanced Mode
-### See [Full Advanced Mode Instructions Here](agentic-rag-docs/self-host.md).
-Use these details if you want to modify the application, e.g. by configuring prompts, adding your own endpoints, changing the Gradio app or whatever else occurs to you.
+```env
+NVIDIA_API_KEY=your_nvidia_api_key
+TAVILY_API_KEY=your_tavily_api_key
+```
 
-1. Set up a Linux box with an NVIDIA GPU and Docker.  
-2. Deploy an Ollama container or an NVIDIA NIM on that host.  
-3. Configure the chat app to use the self-hosted endpoint.
+Never commit `.env` or share these keys.
 
+## Run the Application
 
+With the virtual environment active, run:
 
+```bash
+streamlit run app.py
+```
 
-</details>
+Streamlit will display a local address, usually:
 
-# License
-This NVIDIA AI Workbench example project is under the [Apache 2.0 License](https://github.com/NVIDIA/workbench-example-agentic-rag/blob/main/LICENSE.txt)
+```text
+http://localhost:8501
+```
 
-This project may utilize additional third-party open source software projects. Review the license terms of these open source projects before use. Third party components used as part of this project are subject to their separate legal notices or terms that accompany the components. You are responsible for confirming compliance with third-party component license terms and requirements. 
+Open this address in a browser. Keep the terminal open while the application is running. To stop the app, press `Ctrl + C` in the terminal.
 
-| :question: Have Questions?  |
-| :---------------------------|
-| Please direct any issues, fixes, suggestions, and discussion on this project to the DevZone Members Only Forum thread [here](https://forums.developer.nvidia.com/t/support-workbench-example-project-agentic-rag/303414) |
+## How to Use
 
+### Ask questions about documents
 
+1. Start the app with `streamlit run app.py`.
+2. In the sidebar, select one or more supported files.
+3. Click **Index selected files**.
+4. Wait until the knowledge-base status displays **Context ready**.
+5. Ask a question related to the indexed material.
 
-## Other Resources
-<!-- Links -->
-[:arrow_down: Download AI Workbench](https://www.nvidia.com/en-us/deep-learning-ai/solutions/data-science/workbench/) | [:book: User Guide](https://docs.nvidia.com/ai-workbench/) |[:open_file_folder: Other Projects](https://docs.nvidia.com/ai-workbench/user-guide/latest/quickstart/example-projects.html) | [:rotating_light: User Forum](https://forums.developer.nvidia.com/t/support-workbench-example-project-agentic-rag/303414)
+### Add webpages as context
 
+1. Paste one webpage URL per line in **Web page URLs**.
+2. Click **Add URLs to context**.
+3. Wait for indexing to finish.
+4. Ask a question about the indexed webpages.
+
+URLs entered in the interface are downloaded, chunked, embedded, and stored in the local ChromaDB context. They are not treated as a live Tavily search.
+
+### Use live web search
+
+Clear the active context, then ask a general question. When no indexed context exists, the router uses Tavily to search the web before generating an answer.
+
+## Important Source Policy
+
+| Context state | Behaviour |
+|---|---|
+| No indexed files or URLs | Uses Tavily web search. |
+| Files or URLs indexed | Searches only the local ChromaDB collection. |
+| Indexed context has no answer | Returns a safe not-found message instead of unrelated web content. |
+
+This policy protects source provenance. To get a web answer after working with documents, click **Clear context** first.
+
+## Project Structure
+
+```text
+Agentic-RAG/
+├── app.py                         # Streamlit user interface
+├── .env.example                   # Environment-variable template
+├── requirements.txt               # Python dependencies
+├── code/
+│   └── chatui/
+│       ├── prompts/
+│       │   └── prompts_nemotron.py  # Agent prompts
+│       └── utils/
+│           ├── compile.py           # LangGraph workflow compilation
+│           ├── graph.py             # Workflow nodes and transitions
+│           └── database.py          # Loading, chunking, embeddings, ChromaDB
+├── data/                          # Runtime uploads and vector-store data
+└── output/                        # Generated project documents and reports
+```
+
+## Configuration
+
+Optional settings in `.env`:
+
+```env
+NVIDIA_MODEL_ID=nvidia/nemotron-3.5-lightning-30b-a3b
+RAG_DATA_DIR=./data
+TAVILY_K=3
+RECURSION_LIMIT=10
+```
+
+- `NVIDIA_MODEL_ID`: model used for generation and grading.
+- `RAG_DATA_DIR`: directory for runtime source and vector data.
+- `TAVILY_K`: maximum number of Tavily search results.
+- `RECURSION_LIMIT`: maximum LangGraph workflow iterations for one request.
+
+## Supported Input Types
+
+| Type | Processing method |
+|---|---|
+| PDF | PyPDFLoader |
+| TXT / Markdown | TextLoader |
+| CSV | CSVLoader |
+| Webpage URL | WebBaseLoader |
+
+Text is split recursively into chunks before embedding. The default configuration uses 250-token chunks with zero overlap.
+
+## Validation Performed
+
+The project has been checked for these functional paths:
+
+- Python syntax compilation for the main application, graph, database, and prompt modules.
+- Streamlit application startup.
+- NVIDIA hosted chat and embedding connectivity.
+- ChromaDB indexing and semantic retrieval.
+- Tavily web-search fallback with no context.
+- Document-grounded answer generation and grading.
+- Safe not-found behaviour for unsupported questions within an active context.
+- Parsing of plain `yes`/`no` and JSON-like grading outputs.
+
+## Known Limitations
+
+- The interface does not yet show page-level citations or retrieved chunk excerpts.
+- Scanned PDFs without extractable text require OCR, which is not currently included.
+- An active context blocks Tavily fallback even if the context is unrelated; clear it to use web search.
+- LLM graders are a helpful control layer, not formal guarantees of factual correctness.
+- The project is an inference-time application and does not include a benchmark dataset, training pipeline, or numerical accuracy claims.
+- Production deployment would require authentication, access control, encryption, retention controls, audit logs, and file-security checks.
+
+## Troubleshooting
+
+### `streamlit: command not found`
+
+Activate the virtual environment and reinstall dependencies:
+
+```bash
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### API key warning or model request failure
+
+Verify that `.env` is in the project root and contains a valid `NVIDIA_API_KEY`. Restart Streamlit after changing `.env`.
+
+### Web search does not run
+
+- Confirm `TAVILY_API_KEY` exists in `.env`.
+- Click **Clear context** first. Tavily is intentionally used only when no source context is indexed.
+
+### A document answer cannot find information
+
+Confirm that the file or URL was indexed successfully, then ask a more specific question. The information may not be present in the selected sources.
+
+### Telemetry warning in the terminal
+
+Some third-party libraries may print telemetry warnings. If the application continues to retrieve chunks, generate answers, and complete grading checks, these warnings do not prevent normal use.
+
+## License and Acknowledgements
+
+This project is based on an NVIDIA Agentic RAG reference implementation and retains the repository’s [Apache 2.0 License](LICENSE.txt). It uses open-source libraries and hosted services subject to their respective licenses and terms.
+
+---
+
+Built and documented by **Anshika Garg**.

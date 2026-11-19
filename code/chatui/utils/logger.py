@@ -15,10 +15,16 @@
 
 # Logger class for capturing stdout 
 import sys
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_LOG_PATH = PROJECT_ROOT / "code" / "output.log"
 
 class Logger:
     def __init__(self, filename):
         self.terminal = sys.stdout
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
         self.log = open(filename, "w")
 
     def write(self, message):
@@ -34,5 +40,5 @@ class Logger:
 
 def read_logs():
     sys.stdout.flush()
-    with open("/project/code/output.log", "r") as f:
+    with open(DEFAULT_LOG_PATH, "r") as f:
         return f.read()

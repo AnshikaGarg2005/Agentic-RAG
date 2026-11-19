@@ -1,0 +1,21 @@
+[1] P. Lewis et al., ‘Retrieval-augmented generation for knowledge-intensive NLP tasks,’ Advances in Neural Information Processing Systems, vol. 33, pp. 9459-9474, 2020. https://proceedings.neurips.cc/paper/2020/file/6b493230205f780e1bc26945df7481e5-Paper.pdf
+
+[2] V. Karpukhin et al., ‘Dense passage retrieval for open-domain question answering,’ Proc. EMNLP, 2020, pp. 6769-6781, doi: 10.18653/v1/2020.emnlp-main.550.
+
+[3] N. Reimers and I. Gurevych, ‘Sentence-BERT: Sentence embeddings using Siamese BERT-networks,’ Proc. EMNLP-IJCNLP, 2019, pp. 3982-3992, doi: 10.18653/v1/D19-1410.
+
+[4] S.-Q. Yan, J.-C. Gu, Y. Zhu, and Z.-H. Ling, ‘Corrective retrieval augmented generation,’ arXiv:2401.15884, 2024. https://arxiv.org/abs/2401.15884
+
+[5] A. Asai et al., ‘Self-RAG: Learning to retrieve, generate, and critique through self-reflection,’ Proc. ICLR, 2024. https://proceedings.iclr.cc/paper_files/paper/2024/file/25f7be9694d7b32d5cc670927b8091e1-Paper-Conference.pdf
+
+[6] S. Es et al., ‘RAGAS: Automated evaluation of retrieval augmented generation,’ arXiv:2309.15217, 2023. https://arxiv.org/abs/2309.15217
+
+[7] LangChain, ‘LangGraph documentation,’ 2026. https://langchain-ai.github.io/langgraph/
+
+[8] Chroma, ‘Chroma documentation,’ 2026. https://docs.trychroma.com/
+
+[9] NVIDIA, ‘NVIDIA NIM API reference,’ 2026. https://docs.api.nvidia.com/nim/
+
+[10] Streamlit, ‘Streamlit documentation,’ 2026. https://docs.streamlit.io/
+
+[11] Tavily, ‘Tavily Search API documentation,’ 2026. https://docs.tavily.com/

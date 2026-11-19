@@ -25,6 +25,7 @@ import subprocess
 import time
 import sys
 import json
+from pathlib import Path
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.errors import GraphRecursionError 
@@ -49,7 +50,7 @@ RECURSION_LIMIT = int(os.getenv("RECURSION_LIMIT", DEFAULT_RECURSION_LIMIT))
 
 
 # Model identifiers with prefix
-NANO = "nvidia/nemotron-3-nano-30b-a3b"
+NANO = "nvidia/nemotron-3.5-lightning-30b-a3b"
 SUPER = "nvidia/nemotron-3-super-120b-a12b"
 ULTRA = "nvidia/nemotron-3-ultra-550b-a55b"
 
@@ -58,7 +59,7 @@ INTERNAL_API = os.getenv('INTERNAL_API', 'no')
 
 # Modify model identifiers (to use the internal endpoints if that variable is set).
 if INTERNAL_API == 'yes':
-    NANO = 'nvdev/nvidia/nemotron-3-nano-30b-a3b'
+    NANO = 'nvdev/nvidia/nemotron-3.5-lightning-30b-a3b'
     SUPER = 'nvdev/nvidia/nemotron-3-super-120b-a12b'
     ULTRA = 'nvdev/nvidia/nemotron-3-ultra-550b-a55b'
 
@@ -183,7 +184,7 @@ _LOCAL_CSS = """
 }
 """
 
-sys.stdout = logger.Logger("/project/code/output.log")
+sys.stdout = logger.Logger(logger.DEFAULT_LOG_PATH)
 
 def build_page(client: chat_client.ChatClient) -> gr.Blocks:
     """
@@ -263,7 +264,8 @@ def build_page(client: chat_client.ChatClient) -> gr.Blocks:
                         
                         # Diagram of the agentic websearch RAG workflow
                         with gr.Row():
-                            agentic_flow = gr.Image("/project/code/chatui/static/agentic-flow.png", 
+                            agentic_flow = gr.Image(
+                                                    str(Path(__file__).resolve().parents[1] / "static" / "agentic-flow.png"),
                                                     show_label=False,
                                                     show_download_button=False,
                                                     interactive=False)
@@ -1468,6 +1470,7 @@ def _stream_predict(
               "nim_hallucination_id": nim_hallucination_id,
               "nim_answer_id": nim_answer_id,
               "answer_use_nim": answer_use_nim}
+    inputs["collection_name"] = "rag-chroma"
     
     if not valid_input(question):
         yield "", chat_history + [[str(question), "*** ERR: Unable to process query. Query cannot be empty. ***"]], gr.update(show_label=False)

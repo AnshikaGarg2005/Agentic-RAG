@@ -22,9 +22,6 @@ import argparse
 import os
 import sys
 
-import uvicorn
-
-
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the program.
 
@@ -129,4 +126,4 @@ if __name__ == "__main__":
     proxy_prefix = os.environ.get("PROXY_PREFIX")
     blocks = pages.converse.build_page(client)
     blocks.queue(max_size=10)
-    blocks.launch(server_name="0.0.0.0", server_port=8080, root_path=proxy_prefix)
+    blocks.launch(server_name=args.host, server_port=args.port, root_path=proxy_prefix)

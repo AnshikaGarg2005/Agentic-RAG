@@ -1,0 +1,8 @@
+# Optional dependencies for the original NVIDIA Workbench/Gradio interface.
+# The supported local and Streamlit entry point is app.py.
+-r requirements.txt
+jupyterlab>3.0
+dataclass_wizard==0.22.2
+gradio==4.15.0
+fastapi==0.111.0
+requests

@@ -14,13 +14,14 @@
 # limitations under the License.
 
 import os
+import re
 
 from typing_extensions import TypedDict
 from typing import List, Optional
 
 from langchain.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
-from langchain_nvidia_ai_endpoints import ChatNVIDIA
+from langchain_core.output_parsers import StrOutputParser
+from langchain_openai import ChatOpenAI
 from langchain_community.tools.tavily_search import TavilySearchResults
 
 from chatui.utils import database, nim
@@ -39,6 +40,35 @@ class TavilyAPIError(Exception):
 # component in this workflow expects a direct completion -- the graders parse bare
 # JSON from the response -- so thinking is disabled on each hosted-endpoint call.
 NEMOTRON_NO_THINK = {"chat_template_kwargs": {"enable_thinking": False}}
+NVIDIA_API_BASE = os.getenv("NVIDIA_API_BASE", "https://integrate.api.nvidia.com/v1")
+
+
+def hosted_chat_model(model: str, temperature: float):
+    """Create an NVIDIA hosted model through its OpenAI-compatible API."""
+    return ChatOpenAI(
+        model=model,
+        temperature=temperature,
+        api_key=os.getenv("NVIDIA_API_KEY"),
+        base_url=NVIDIA_API_BASE,
+        extra_body=NEMOTRON_NO_THINK,
+    )
+
+
+def _binary_score(response) -> str:
+    """Read a yes/no grader result without assuming one exact JSON key casing."""
+    if isinstance(response, dict):
+        for key in ("score", "grade", "verdict", "answer", "relevance", "grounded", "useful"):
+            if key in response:
+                response = response[key]
+                break
+        else:
+            response = " ".join(str(value) for value in response.values())
+
+    match = re.search(r"\b(yes|no)\b", str(response).lower())
+    if match:
+        return match.group(1)
+    # Failing closed prevents unsupported document content becoming an answer.
+    return "no"
 
 
 
@@ -74,6 +104,7 @@ class GraphState(TypedDict):
     generator_use_nim: bool
     hallucination_use_nim: bool
     answer_use_nim: bool
+    collection_name: str
     nim_generator_ip: str
     nim_router_ip: str
     nim_retrieval_ip: str
@@ -129,7 +160,7 @@ def retrieve(state):
     question = state["question"]
 
     # Retrieval
-    retriever = database.get_retriever()
+    retriever = database.get_retriever(state["collection_name"])
     documents = retriever.invoke(question)
     print(f"[Retriever] Retrieved {len(documents)} chunk(s) from the vector database")
     return {"documents": documents, "question": question}
@@ -152,16 +183,17 @@ def generate(state):
     # RAG generation
     prompt = PromptTemplate(
         template=state["prompt_generator"],
-        input_variables=["question", "document"],
+        input_variables=["question", "context"],
     )
     llm = nim.CustomChatOpenAI(custom_endpoint=state["nim_generator_ip"], 
                                port=state["nim_generator_port"] if len(state["nim_generator_port"]) > 0 else "8000",
                                model_name=state["nim_generator_id"] if len(state["nim_generator_id"]) > 0 else "meta/llama-3.1-8b-instruct",
                                gpu_type=state["nim_generator_gpu_type"] if "nim_generator_gpu_type" in state else None,
                                gpu_count=state["nim_generator_gpu_count"] if "nim_generator_gpu_count" in state else None,
-                               temperature=0.7) if state["generator_use_nim"] else ChatNVIDIA(model=state["generator_model_id"], temperature=0.7).bind(**NEMOTRON_NO_THINK)
+                               temperature=0.7) if state["generator_use_nim"] else hosted_chat_model(state["generator_model_id"], 0.7)
     rag_chain = prompt | llm | StrOutputParser()
-    generation = rag_chain.invoke({"context": documents, "question": question})
+    context = "\n\n".join(document.page_content for document in documents)
+    generation = rag_chain.invoke({"context": context, "question": question})
     print(f"[Generator] ✓ Draft answer generated ({len(generation)} characters)")
     return {"documents": documents, "question": question, "generation": generation}
 
@@ -194,13 +226,13 @@ def grade_documents(state):
                                model_name=state["nim_retrieval_id"] if len(state["nim_retrieval_id"]) > 0 else "meta/llama-3.1-8b-instruct",
                                gpu_type=state["nim_retrieval_gpu_type"] if "nim_retrieval_gpu_type" in state else None,
                                gpu_count=state["nim_retrieval_gpu_count"] if "nim_retrieval_gpu_count" in state else None,
-                               temperature=0.7) if state["retrieval_use_nim"] else ChatNVIDIA(model=state["retrieval_model_id"], temperature=0).bind(**NEMOTRON_NO_THINK)
-    retrieval_grader = prompt | llm | JsonOutputParser()
+                               temperature=0.7) if state["retrieval_use_nim"] else hosted_chat_model(state["retrieval_model_id"], 0)
+    retrieval_grader = prompt | llm | StrOutputParser()
     for i, d in enumerate(documents):
         score = retrieval_grader.invoke(
             {"question": question, "document": d.page_content}
         )
-        grade = score["score"]
+        grade = _binary_score(score)
         # Document relevant
         if grade.lower() == "yes":
             print(f"[Retrieval Grader] Chunk {i + 1} of {len(documents)}: ✓ relevant")
@@ -272,26 +304,11 @@ def route_question(state):
         str: Next node to call
     """
 
-    question = state["question"]
-    print(f"[Router] Choosing a data source using {_model_desc(state, 'router')}...")
-    prompt = PromptTemplate(
-        template=state["prompt_router"],
-        input_variables=["question"],
-    )
-    llm = nim.CustomChatOpenAI(custom_endpoint=state["nim_router_ip"], 
-                               port=state["nim_router_port"] if len(state["nim_router_port"]) > 0 else "8000",
-                               model_name=state["nim_router_id"] if len(state["nim_router_id"]) > 0 else "meta/llama-3.1-8b-instruct",
-                               gpu_type=state["nim_router_gpu_type"] if "nim_router_gpu_type" in state else None,
-                               gpu_count=state["nim_router_gpu_count"] if "nim_router_gpu_count" in state else None,
-                               temperature=0.7) if state["router_use_nim"] else ChatNVIDIA(model=state["router_model_id"], temperature=0).bind(**NEMOTRON_NO_THINK)
-    question_router = prompt | llm | JsonOutputParser()
-    source = question_router.invoke({"question": question})
-    if source["datasource"] == "web_search":
-        print("[Router] → Question falls outside the document context — routing to web search")
-        return "websearch"
-    elif source["datasource"] == "vectorstore":
-        print("[Router] → Question matches the document context — routing to the vector database")
+    if database.has_context(state["collection_name"]):
+        print("[Router] → A document context is available — searching the vector database first")
         return "vectorstore"
+    print("[Router] → No document context is available — routing to web search")
+    return "websearch"
 
 
 def decide_to_generate(state):
@@ -310,14 +327,23 @@ def decide_to_generate(state):
     filtered_documents = state["documents"]
 
     if web_search == "Yes":
-        # All documents have been filtered check_relevance
-        # We will re-generate a new query
-        print("[Agent] No relevant chunks survived grading — falling back to web search")
-        return "websearch"
+        # A document collection was deliberately supplied by the user. Do not
+        # replace an unsupported document answer with an unrelated web result.
+        print("[Agent] No relevant document chunks survived grading — returning a grounded not-found response")
+        return "not_found"
     else:
         # We have relevant documents, so generate answer
         print(f"[Agent] {len(filtered_documents)} relevant chunk(s) in hand — proceeding to answer generation")
         return "generate"
+
+
+def no_answer(state):
+    """Return a safe response when the indexed sources do not answer a question."""
+    return {
+        "documents": state.get("documents", []),
+        "question": state["question"],
+        "generation": "I couldn't find that information in the indexed sources. Try a more specific question or add another source.",
+    }
 
 
 ### Conditional edge
@@ -348,13 +374,13 @@ def grade_generation_v_documents_and_question(state):
                                model_name=state["nim_hallucination_id"] if len(state["nim_hallucination_id"]) > 0 else "meta/llama-3.1-8b-instruct",
                                gpu_type=state["nim_hallucination_gpu_type"] if "nim_hallucination_gpu_type" in state else None,
                                gpu_count=state["nim_hallucination_gpu_count"] if "nim_hallucination_gpu_count" in state else None,
-                               temperature=0.7) if state["hallucination_use_nim"] else ChatNVIDIA(model=state["hallucination_model_id"], temperature=0).bind(**NEMOTRON_NO_THINK)
-    hallucination_grader = prompt | llm | JsonOutputParser()
+                               temperature=0.7) if state["hallucination_use_nim"] else hosted_chat_model(state["hallucination_model_id"], 0)
+    hallucination_grader = prompt | llm | StrOutputParser()
 
     score = hallucination_grader.invoke(
         {"documents": documents, "generation": generation}
     )
-    grade = score["score"]
+    grade = _binary_score(score)
 
     # Check hallucination
     prompt = PromptTemplate(
@@ -366,15 +392,15 @@ def grade_generation_v_documents_and_question(state):
                                model_name=state["nim_answer_id"] if len(state["nim_answer_id"]) > 0 else "meta/llama-3.1-8b-instruct",
                                gpu_type=state["nim_answer_gpu_type"] if "nim_answer_gpu_type" in state else None,
                                gpu_count=state["nim_answer_gpu_count"] if "nim_answer_gpu_count" in state else None,
-                               temperature=0.7) if state["answer_use_nim"] else ChatNVIDIA(model=state["answer_model_id"], temperature=0).bind(**NEMOTRON_NO_THINK)
-    answer_grader = prompt | llm | JsonOutputParser()
+                               temperature=0.7) if state["answer_use_nim"] else hosted_chat_model(state["answer_model_id"], 0)
+    answer_grader = prompt | llm | StrOutputParser()
     
     if grade == "yes":
         print("[Hallucination Grader] ✓ Answer is grounded in the retrieved context")
         # Check question-answering
         print(f"[Answer Grader] Checking the answer addresses the question using {_model_desc(state, 'answer')}...")
         score = answer_grader.invoke({"question": question, "generation": generation})
-        grade = score["score"]
+        grade = _binary_score(score)
         if grade == "yes":
             print("[Answer Grader] ✓ Answer addresses the question")
             return "useful"

@@ -18,14 +18,10 @@ import os
 
 import gradio as gr
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from chatui.chat_client import ChatClient
 
 from chatui import pages
-
-STATIC_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), "static")
-
 
 class APIServer(FastAPI):
     """A class that hosts the service api.
@@ -51,22 +47,14 @@ class APIServer(FastAPI):
             blocks=pages.converse.build_page(self._client),
             path=f"/content{pages.converse.PATH}",
         )
-        _ = gr.mount_gradio_app(
-            self,
-            blocks=pages.kb.build_page(self._client),
-            path=f"/content{pages.kb.PATH}",
-        )
-
         @self.get("/")
-        async def root_redirect() -> FileResponse:
-            return FileResponse(os.path.join(STATIC_DIR, "converse.html"))
+        async def root_redirect() -> RedirectResponse:
+            return RedirectResponse(url="/content/")
 
         @self.get("/converse")
-        async def converse_redirect() -> FileResponse:
-            return FileResponse(os.path.join(STATIC_DIR, "converse.html"))
+        async def converse_redirect() -> RedirectResponse:
+            return RedirectResponse(url="/content/")
 
         @self.get("/kb")
-        async def kb_redirect() -> FileResponse:
-            return FileResponse(os.path.join(STATIC_DIR, "kb.html"))
-
-        self.mount("/", StaticFiles(directory=STATIC_DIR, html=True))
+        async def kb_redirect() -> RedirectResponse:
+            return RedirectResponse(url="/content/")

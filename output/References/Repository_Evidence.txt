@@ -1,0 +1,6 @@
+Active entry point: app.py
+Graph: code/chatui/utils/compile.py and graph.py
+Ingestion: code/chatui/utils/database.py
+Prompts: code/chatui/prompts/prompts_nemotron.py
+
+Audit finding: no labelled benchmark dataset, model checkpoints, training logs, loss curves, confusion matrices, ROC curves, or quantitative evaluation outputs were found. The paper therefore makes no unsupported metric claims.

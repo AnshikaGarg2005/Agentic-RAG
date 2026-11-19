@@ -26,6 +26,7 @@ def compile_graph():
     workflow.add_node("retrieve", graph.retrieve)  # retrieve
     workflow.add_node("grade_documents", graph.grade_documents)  # grade documents
     workflow.add_node("generate", graph.generate)  # generate
+    workflow.add_node("not_found", graph.no_answer)  # source-grounded fallback
 
     # Build graph
     workflow.set_conditional_entry_point(
@@ -43,8 +44,10 @@ def compile_graph():
         {
             "websearch": "websearch",
             "generate": "generate",
+            "not_found": "not_found",
         },
     )
+    workflow.add_edge("not_found", END)
     workflow.add_edge("websearch", "generate")
     workflow.add_conditional_edges(
         "generate",
@@ -57,5 +60,3 @@ def compile_graph():
     )
 
     return workflow
-
-    
